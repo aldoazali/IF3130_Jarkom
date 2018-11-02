@@ -29,18 +29,15 @@ int main(int argc, char * argv[]) {
     memset(&serverAddress, 0, sizeof(serverAddress)); 
     memset(&clientAddress, 0, sizeof(clientAddress)); 
 
-    /* Fill server address data structure */
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(port);
 
-    /* Create socket file descriptor */ 
     if ((socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         cerr << "socket creation failed" << endl;
         return 1;
     }
 
-    /* Bind socket to server address */
     if (::bind(socket_fd, (const struct sockaddr *)&serverAddress, 
             sizeof(serverAddress)) < 0) { 
         cerr << "socket binding failed" << endl;
@@ -52,8 +49,6 @@ int main(int argc, char * argv[]) {
     FILE *file = fopen(fname, "wb");
     char buffer[maxBufferSize];
     int bufferSize;
-
-    /* Initialize sliding window variables */
     char frame[MAX_FRAME_SIZE];
     char data[MAX_DATA_SIZE];
     char ack[ACK_SIZE];
@@ -136,7 +131,7 @@ int main(int argc, char * argv[]) {
                 }
             }
             
-            /* Move to next buffer if all frames in current buffer has been received */
+            /* Move to the next buffer if all frames in current buffer has been received */
             if (lfr >= receivedSeqCount - 1) break;
         }
 
