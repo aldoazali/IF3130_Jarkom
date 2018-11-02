@@ -37,7 +37,7 @@ void listen_ack() {
         ack_size = recvfrom(socket_fd, (char *)ack, ACK_SIZE, 
                 MSG_WAITALL, (struct sockaddr *) &server_addr, 
                 &server_addr_size);
-        ack_error = read_ack(&ack_seq_num, &ack_neg, ack);
+        ack_error = readACK(&ack_seq_num, &ack_neg, ack);
 
         window_info_mutex.lock();
 
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
                         memcpy(data, buffer + buffer_shift, data_size);
                         
                         bool eot = (seq_num == seq_count - 1) && (read_done);
-                        frame_size = create_frame(seq_num, frame, data, data_size, eot);
+                        frame_size = createFrame(seq_num, frame, data, data_size, eot);
 
                         sendto(socket_fd, frame, frame_size, 0, 
                                 (const struct sockaddr *) &server_addr, sizeof(server_addr));

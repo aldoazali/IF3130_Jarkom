@@ -1,43 +1,14 @@
 #include <iostream>
-#include <thread>
-
 #include <stdio.h>
+#include <thread>
 #include <sys/socket.h>
 #include <netdb.h>
-
 #include "helpers.h"
-
-#define STDBY_TIME 3000
 
 using namespace std;
 
 int socket_fd;
 struct sockaddr_in serverAddress, clientAddress;
-
-void sendACK() {
-    char frame[MAX_FRAME_SIZE];
-    char data[MAX_DATA_SIZE];
-    char ack[ACK_SIZE];
-    int frameSize;
-    int dataSize;
-    socklen_t clientAddressSize;
-    
-    int receivedSeqNumber;
-    bool isFrameError;
-    bool eot;
-
-    /* Listen for frames and send ack */
-    while (true) {
-        frameSize = recvfrom(socket_fd, (char *)frame, MAX_FRAME_SIZE, 
-                MSG_WAITALL, (struct sockaddr *) &clientAddress, 
-                &clientAddressSize);
-        isFrameError = read_frame(&receivedSeqNumber, data, &dataSize, &eot, frame);
-
-        create_ack(receivedSeqNumber, ack, isFrameError);
-        sendto(socket_fd, ack, ACK_SIZE, 0, 
-                (const struct sockaddr *) &clientAddress, clientAddressSize);
-    }
-}
 
 int main(int argc, char * argv[]) {
     int port;
@@ -57,7 +28,7 @@ int main(int argc, char * argv[]) {
 
     memset(&serverAddress, 0, sizeof(serverAddress)); 
     memset(&clientAddress, 0, sizeof(clientAddress)); 
-      
+
     /* Fill server address data structure */
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
@@ -114,7 +85,7 @@ int main(int argc, char * argv[]) {
             frameSize = recvfrom(socket_fd, (char *) frame, MAX_FRAME_SIZE, 
                     MSG_WAITALL, (struct sockaddr *) &clientAddress, 
                     &clientAddressSize);
-            isFrameError = read_frame(&receivedSeqNumber, data, &dataSize, &eot, frame);
+            isFrameError = readFrame(&receivedSeqNumber, data, &dataSize, &eot, frame);
 
             if (isFrameError) {
                 cout << endl << "->x Frame received contains errors";
@@ -123,7 +94,7 @@ int main(int argc, char * argv[]) {
                 cout << endl << "-> Frame " << receivedSeqNumber << " received";
                 cout << endl << "<- Sending ACK";
             }
-            create_ack(receivedSeqNumber, ack, isFrameError);
+            createACK(receivedSeqNumber, ack, isFrameError);
             sendto(socket_fd, ack, ACK_SIZE, 0, 
                     (const struct sockaddr *) &clientAddress, clientAddressSize);
 
@@ -179,4 +150,29 @@ int main(int argc, char * argv[]) {
 
     cout << "\nData Received" << endl;
     return 0;
+}
+
+void sendACK() {
+    char frame[MAX_FRAME_SIZE];
+    char data[MAX_DATA_SIZE];
+    char ack[ACK_SIZE];
+    int frameSize;
+    int dataSize;
+    socklen_t clientAddressSize;
+    
+    int receivedSeqNumber;
+    bool isFrameError;
+    bool eot;
+
+    /* Listen for frames and send ack */
+    while (true) {
+        frameSize = recvfrom(socket_fd, (char *)frame, MAX_FRAME_SIZE, 
+                MSG_WAITALL, (struct sockaddr *) &clientAddress, 
+                &clientAddressSize);
+        isFrameError = readFrame(&receivedSeqNumber, data, &dataSize, &eot, frame);
+
+        createACK(receivedSeqNumber, ack, isFrameError);
+        sendto(socket_fd, ack, ACK_SIZE, 0, 
+                (const struct sockaddr *) &clientAddress, clientAddressSize);
+    }
 }
