@@ -47,5 +47,5 @@ After that the program will send the file specified in the sendfile command and 
 # Pembagian Tugas
 
 13516008 - Muhammad Aufa Helfiandri
-13516056 - Muhammad Rafly Alkhadafi
+13516056 - Muhammad Rafli Al Khadafi
 13516125 - Aldo Azali

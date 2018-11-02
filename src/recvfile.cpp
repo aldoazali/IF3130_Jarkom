@@ -76,7 +76,7 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
-    cout << "Listening on port " << port << endl << endl;
+    cout << "Waiting for transmission on port " << port << endl << endl;
 
     FILE *file = fopen(fname, "wb");
     char buffer[max_buffer_size];
@@ -120,8 +120,8 @@ int main(int argc, char * argv[]) {
                 cout << endl << "->x Frame received contains errors";
                 cout << endl << "<- Sending NAK";
             } else {
-                cout << endl << "-> Frame received contains errors";
-                cout << endl << "<- Sending NAK";
+                cout << endl << "-> Frame " << recv_seq_num << " received";
+                cout << endl << "<- Sending ACK";
             }
             create_ack(recv_seq_num, ack, frame_error);
             sendto(socket_fd, ack, ACK_SIZE, 0, 
@@ -161,7 +161,7 @@ int main(int argc, char * argv[]) {
                         recv_done = true;
                     }
                 } else {
-                    cout << endl << "[x] Frame received contains errors";
+                    cout << endl << endl << "[x] Frame received contains errors" << endl;
                 }
             }
             
