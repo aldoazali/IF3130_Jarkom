@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#include "helpers.h"
+#include "utils.h"
 
 #define TIMEOUT 10
 
