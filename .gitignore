@@ -1,3 +1,4 @@
 recvfile
 sendfile
 *.txt
+.vscode/

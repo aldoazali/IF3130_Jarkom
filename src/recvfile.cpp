@@ -12,56 +12,56 @@
 using namespace std;
 
 int socket_fd;
-struct sockaddr_in server_addr, client_addr;
+struct sockaddr_in serverAddress, clientAddress;
 
-void send_ack() {
+void sendACK() {
     char frame[MAX_FRAME_SIZE];
     char data[MAX_DATA_SIZE];
     char ack[ACK_SIZE];
-    int frame_size;
-    int data_size;
-    socklen_t client_addr_size;
+    int frameSize;
+    int dataSize;
+    socklen_t clientAddressSize;
     
-    int recv_seq_num;
-    bool frame_error;
+    int receivedSeqNumber;
+    bool isFrameError;
     bool eot;
 
     /* Listen for frames and send ack */
     while (true) {
-        frame_size = recvfrom(socket_fd, (char *)frame, MAX_FRAME_SIZE, 
-                MSG_WAITALL, (struct sockaddr *) &client_addr, 
-                &client_addr_size);
-        frame_error = read_frame(&recv_seq_num, data, &data_size, &eot, frame);
+        frameSize = recvfrom(socket_fd, (char *)frame, MAX_FRAME_SIZE, 
+                MSG_WAITALL, (struct sockaddr *) &clientAddress, 
+                &clientAddressSize);
+        isFrameError = read_frame(&receivedSeqNumber, data, &dataSize, &eot, frame);
 
-        create_ack(recv_seq_num, ack, frame_error);
+        create_ack(receivedSeqNumber, ack, isFrameError);
         sendto(socket_fd, ack, ACK_SIZE, 0, 
-                (const struct sockaddr *) &client_addr, client_addr_size);
+                (const struct sockaddr *) &clientAddress, clientAddressSize);
     }
 }
 
 int main(int argc, char * argv[]) {
     int port;
-    int window_len;
-    int max_buffer_size;
+    int windowSize;
+    int maxBufferSize;
     char *fname;
 
     if (argc == 5) {
         fname = argv[1];
-        window_len = (int) atoi(argv[2]);
-        max_buffer_size = MAX_DATA_SIZE * (int) atoi(argv[3]);
+        windowSize = (int) atoi(argv[2]);
+        maxBufferSize = MAX_DATA_SIZE * (int) atoi(argv[3]);
         port = atoi(argv[4]);
     } else {
         cerr << "usage: ./recvfile <filename> <window_size> <buffer_size> <port>" << endl;
         return 1;
     }
 
-    memset(&server_addr, 0, sizeof(server_addr)); 
-    memset(&client_addr, 0, sizeof(client_addr)); 
+    memset(&serverAddress, 0, sizeof(serverAddress)); 
+    memset(&clientAddress, 0, sizeof(clientAddress)); 
       
     /* Fill server address data structure */
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY; 
-    server_addr.sin_port = htons(port);
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+    serverAddress.sin_port = htons(port);
 
     /* Create socket file descriptor */ 
     if ((socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -70,8 +70,8 @@ int main(int argc, char * argv[]) {
     }
 
     /* Bind socket to server address */
-    if (::bind(socket_fd, (const struct sockaddr *)&server_addr, 
-            sizeof(server_addr)) < 0) { 
+    if (::bind(socket_fd, (const struct sockaddr *)&serverAddress, 
+            sizeof(serverAddress)) < 0) { 
         cerr << "socket binding failed" << endl;
         return 1;
     }
@@ -79,86 +79,86 @@ int main(int argc, char * argv[]) {
     cout << "Waiting for transmission on port " << port << endl << endl;
 
     FILE *file = fopen(fname, "wb");
-    char buffer[max_buffer_size];
-    int buffer_size;
+    char buffer[maxBufferSize];
+    int bufferSize;
 
     /* Initialize sliding window variables */
     char frame[MAX_FRAME_SIZE];
     char data[MAX_DATA_SIZE];
     char ack[ACK_SIZE];
-    int frame_size;
-    int data_size;
+    int frameSize;
+    int dataSize;
     int lfr, laf;
-    int recv_seq_num;
+    int receivedSeqNumber;
     bool eot;
-    bool frame_error;
+    bool isFrameError;
 
     /* Receive frames until End of Transmission */
-    bool recv_done = false;
-    int buffer_num = 0;
-    while (!recv_done) {
-        buffer_size = max_buffer_size;
-        memset(buffer, 0, buffer_size);
+    bool isDoneReceived = false;
+    int bufferNum = 0;
+    while (!isDoneReceived) {
+        bufferSize = maxBufferSize;
+        memset(buffer, 0, bufferSize);
     
-        int recv_seq_count = (int) max_buffer_size / MAX_DATA_SIZE;
-        bool window_recv_mask[window_len];
-        for (int i = 0; i < window_len; i++) {
-            window_recv_mask[i] = false;
+        int receivedSeqCount = (int) maxBufferSize / MAX_DATA_SIZE;
+        bool windowReceived[windowSize];
+        for (int i = 0; i < windowSize; i++) {
+            windowReceived[i] = false;
         }
         lfr = -1;
-        laf = lfr + window_len;
+        laf = lfr + windowSize;
         
         /* Receive current buffer with sliding window */
         while (true) {
-            socklen_t client_addr_size;
-            frame_size = recvfrom(socket_fd, (char *) frame, MAX_FRAME_SIZE, 
-                    MSG_WAITALL, (struct sockaddr *) &client_addr, 
-                    &client_addr_size);
-            frame_error = read_frame(&recv_seq_num, data, &data_size, &eot, frame);
+            socklen_t clientAddressSize;
+            frameSize = recvfrom(socket_fd, (char *) frame, MAX_FRAME_SIZE, 
+                    MSG_WAITALL, (struct sockaddr *) &clientAddress, 
+                    &clientAddressSize);
+            isFrameError = read_frame(&receivedSeqNumber, data, &dataSize, &eot, frame);
 
-            if (frame_error) {
+            if (isFrameError) {
                 cout << endl << "->x Frame received contains errors";
                 cout << endl << "<- Sending NAK";
             } else {
-                cout << endl << "-> Frame " << recv_seq_num << " received";
+                cout << endl << "-> Frame " << receivedSeqNumber << " received";
                 cout << endl << "<- Sending ACK";
             }
-            create_ack(recv_seq_num, ack, frame_error);
+            create_ack(receivedSeqNumber, ack, isFrameError);
             sendto(socket_fd, ack, ACK_SIZE, 0, 
-                    (const struct sockaddr *) &client_addr, client_addr_size);
+                    (const struct sockaddr *) &clientAddress, clientAddressSize);
 
-            if (recv_seq_num <= laf) {
-                if (!frame_error) {
-                    int buffer_shift = recv_seq_num * MAX_DATA_SIZE;
+            if (receivedSeqNumber <= laf) {
+                if (!isFrameError) {
+                    int bufferShift = receivedSeqNumber * MAX_DATA_SIZE;
 
-                    if (recv_seq_num == lfr + 1) {
-                        memcpy(buffer + buffer_shift, data, data_size);
+                    if (receivedSeqNumber == lfr + 1) {
+                        memcpy(buffer + bufferShift, data, dataSize);
 
                         int shift = 1;
-                        for (int i = 1; i < window_len; i++) {
-                            if (!window_recv_mask[i]) break;
+                        for (int i = 1; i < windowSize; i++) {
+                            if (!windowReceived[i]) break;
                             shift += 1;
                         }
-                        for (int i = 0; i < window_len - shift; i++) {
-                            window_recv_mask[i] = window_recv_mask[i + shift];
+                        for (int i = 0; i < windowSize - shift; i++) {
+                            windowReceived[i] = windowReceived[i + shift];
                         }
-                        for (int i = window_len - shift; i < window_len; i++) {
-                            window_recv_mask[i] = false;
+                        for (int i = windowSize - shift; i < windowSize; i++) {
+                            windowReceived[i] = false;
                         }
                         lfr += shift;
-                        laf = lfr + window_len;
-                    } else if (recv_seq_num > lfr + 1) {
-                        if (!window_recv_mask[recv_seq_num - (lfr + 1)]) {
-                            memcpy(buffer + buffer_shift, data, data_size);
-                            window_recv_mask[recv_seq_num - (lfr + 1)] = true;
+                        laf = lfr + windowSize;
+                    } else if (receivedSeqNumber > lfr + 1) {
+                        if (!windowReceived[receivedSeqNumber - (lfr + 1)]) {
+                            memcpy(buffer + bufferShift, data, dataSize);
+                            windowReceived[receivedSeqNumber - (lfr + 1)] = true;
                         }
                     }
 
                     /* Set max sequence to sequence of frame with EOT */ 
                     if (eot) {
-                        buffer_size = buffer_shift + data_size;
-                        recv_seq_count = recv_seq_num + 1;
-                        recv_done = true;
+                        bufferSize = bufferShift + dataSize;
+                        receivedSeqCount = receivedSeqNumber + 1;
+                        isDoneReceived = true;
                     }
                 } else {
                     cout << endl << endl << "[x] Frame received contains errors" << endl;
@@ -166,21 +166,16 @@ int main(int argc, char * argv[]) {
             }
             
             /* Move to next buffer if all frames in current buffer has been received */
-            if (lfr >= recv_seq_count - 1) break;
+            if (lfr >= receivedSeqCount - 1) break;
         }
 
-        cout << "\n" << "[RECEIVED " << (unsigned long long) buffer_num * (unsigned long long) 
-                max_buffer_size + (unsigned long long) buffer_size << " BYTES]" << flush;
-        fwrite(buffer, 1, buffer_size, file);
-        buffer_num += 1;
+        cout << "\n" << "[RECEIVED " << (unsigned long long) bufferNum * (unsigned long long) 
+                maxBufferSize + (unsigned long long) bufferSize << " BYTES]" << flush;
+        fwrite(buffer, 1, bufferSize, file);
+        bufferNum += 1;
     }
 
     fclose(file);
-
-    /* Start thread to keep sending requested ack to sender for 3 seconds */
-    thread stdby_thread(send_ack);
-    time_stamp start_time = current_time();
-    stdby_thread.detach();
 
     cout << "\nData Received" << endl;
     return 0;
