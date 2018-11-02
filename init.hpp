@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <arpa/inet.h>
 #include <bitset>
-//#include <chrono>
 #include <cstring>
 #include <ctime>
 #include <iostream>
@@ -20,7 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* ASCII Constants */
+/* Constants */
 #define C_SOH 1
 #define C_STX 2
 #define C_ETX 3
@@ -33,8 +32,6 @@
 /* XON/XOFF protocol */
 #define XON (0x11)
 #define XOFF (0x13)
-
-
 
 using namespace std;
 
@@ -75,22 +72,25 @@ typedef struct SENDWINDOW {
 	unsigned int maxsize;
 } SENDWINDOW;
 
-//Send message
+// ERROR message
+void error(std::string message);
+
+// Send message
 void sendSegment(Byte seqnum, Byte data, int sock, struct sockaddr_in receiverAddr, int slen);
 
-//Add data to back of window
+// Add data to back of window
 void putBack(Byte data, SENDWINDOW* window);
 
-//Remove head data from window
+// Remove head data from window
 void delHead(SENDWINDOW* window);
 
-//Get string of CRC from bitstring
+// Get string of CRC from bitstring
 string createCRC(string bitStr);
 
-//Generate BitString from message
+// Generate BitString from message
 string getBitString(SEGMENT msg);
 
-//Generate checksum from message to be sent
+// Generate checksum from message to be sent
 Byte getChecksum(SEGMENT msg);
 
 void* receiveResponse(void*);
