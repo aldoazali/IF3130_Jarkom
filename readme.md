@@ -1,51 +1,53 @@
 # Sliding Windows Jarkom
 
 
-## Compiling
+## Compile Program
 
-Change Directory to the project folder and use "make" command to correctly compile the program.
+Gunakan comman `make` untuk meng-compile kedua recvfile dan sendfile
 
-## Initiate File
+## Menjalankan Program
 
-Create A file with any name specified on the root folder of the program.
+Buka 2 terminal, yang pertama bertindak sebagai sender dan satunya sebagai receiver.
 
-## Running The Program
+Pada terminal sender, gunakan command `./sendfile <filename> <window_len> <buffer_size> <destination_ip> <destination_port>`.
 
-Open 2 Command Prompt one serve as sender and other serve as receiver. On the Sender Command Prompt write the command ./sendfile <filename> <window_len> <buffer_size> <destination_ip> <destination_port>
-and in the Receiver Command Prompt write the command
-./recvfile <filename> <window_size> <buffer_size> <port>
-After that the program will send the file specified in the sendfile command and output it in the file specified in the receiver command.
+Pada terminal receiver, gunakan command `./recvfile <filename> <window_size> <buffer_size> <port>`.
+
+Setelah itu, program akan mengirimkan file yang dicantumkan pada argumen sendfile dan menuliskannya pada file yang dicantumkan pada receive file
 
 
 # Cara Kerja Sliding Windows
 
 ### Sender :
-    1. First, Program will read the file specified in the sender command
-    2. Program then will start thread to listen for ack
-    3. Create Buffer lists, While read is not done then do :
-        1. Read File and Put to buffer
-        2. If buffer size == Max_Buffer Size then check if file had been fully read if yes then break from loop else     continue loop
-        3. Else continue Loop
-    4. Send buffers, While sending is not done do :
-        1. Check windows ack mask then shift windows if possible
-        2. Send frames that has not been sent or has timed out
-        3. Move to next buffer if all frames in current buffer has been acked
-    5. Finish send
+
+1. Pertama, program akan membaca file yang ditulis pada argumen program sender
+2. Lalu program akan memulai thread untuk menunggu ACK
+3. Membuat Buffer, selama belum selesai maka lakukan:
+	- Baca sebagian file dan masukkan ke buffer
+	- Jika buffer telah terisi penuh, periksa apakah file telah selesai dibaca. Jika ya maka keluar dari loop
+	- Jika tidak maka lanjutkan loop
+
+4. Kirim buffer, selama pengiriman belum berakhir maka lakukan:
+	- Periksa apakah window telah di ack, jika iya maka geser window
+	- Kirim frame yang belum terkirim atau sudah time out
+	- Ambil buffer selanjutnya dan kirimkan seperti langkah ini jika semua frame pada buffer saat ini telah di ACK
+5. Pengiriman selesai
+
+  
 
 ### Receiver :
-    1. Listen for transmission
-    2. If transmission received stop listening and start receiving frames
-    3. While receiving is not done yet do :
-        1. If Frame contains error send NAK
-        2. Else create ACK and sent to the sender port
-        3. Then append the buffer received to output file.
-        4. Set max sequence to sequence of frame with EOT
-        5. Move to next buffer if all frames in current buffer has been received
-    4. Start thread to keep sending requested ack to sender for 3 seconds
+1. Menunggu transmisi datang
+2. Jika transmisi diterima, maka terima frame-frame yang datang
+3. Selama menerima frame belum selesai lakukan:
+	- Jika frame mengandung error maka kirim NAK (Negative Acknowledgement)
+	- Jika tidak maka kirim ACK kepada pengirim
+	- Set max sequence menjadi sequence of frame ketika EOT (End of Transmission)
+	- Pindah ke buffer selanjutnya jika semua frame pada buffer telah diterima
+
 
 
 # Pembagian Tugas
 
-13516008 - Muhammad Aufa Helfiandri
-13516056 - Muhammad Rafli Al Khadafi
-13516125 - Aldo Azali
+1. 13516008 - Muhammad Aufa Helfiandri : createFrame, createACK, readFrame, readACK
+2. 13516056 - Muhammad Rafli Al Khadafi : sendACK, recvfile
+3. 13516125 - Aldo Azali : listenACK, sendfile
