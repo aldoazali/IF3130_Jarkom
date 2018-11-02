@@ -9,48 +9,53 @@
 
 #include "utils.h"
 
-#define TIMEOUT 10
+#define TIMEOUT 1000
 
 using namespace std;
 
-int socket_fd;
-struct sockaddr_in server_addr, client_addr;
+int sock;
+struct sockaddr_in serverAddr, clientAddr;
 
-int window_len;
-bool *window_ack_mask;
-time_stamp *window_sent_time;
+int window_size;
+bool *get_ack;
+time_stamp *send_time;
 int lar, lfs;
 
 time_stamp TMIN = current_time();
-mutex window_info_mutex;
+mutex window_mutex;
+
+void error(std::string message) {
+    perror(message.c_str());
+    exit(EXIT_FAILURE);
+}
 
 void listen_ack() {
     char ack[ACK_SIZE];
     int ack_size;
-    int ack_seq_num;
+    int ack_seqnum;
     bool ack_error;
     bool ack_neg;
 
     /* Listen for ack from reciever */
     while (true) {
-        socklen_t server_addr_size;
-        ack_size = recvfrom(socket_fd, (char *)ack, ACK_SIZE, 
-                MSG_WAITALL, (struct sockaddr *) &server_addr, 
-                &server_addr_size);
-        ack_error = readACK(&ack_seq_num, &ack_neg, ack);
+        socklen_t server_size;
+        ack_size = recvfrom(sock, (char *)ack, ACK_SIZE, 
+                MSG_WAITALL, (struct sockaddr *) &serverAddr, 
+                &server_size);
+        ack_error = readACK(&ack_seqnum, &ack_neg, ack);
 
-        window_info_mutex.lock();
+        window_mutex.lock();
 
-        if (!ack_error && ack_seq_num > lar && ack_seq_num <= lfs) {
+        if (!ack_error && ack_seqnum > lar && ack_seqnum <= lfs) {
             if (!ack_neg) {
-                window_ack_mask[ack_seq_num - (lar + 1)] = true;
-                cout << endl << "-> ACK with sequence number " << ack_seq_num << " is just received";
+                get_ack[ack_seqnum - (lar + 1)] = true;
+                cout << endl << "-> ACK with sequence number " << ack_seqnum << " is just received";
             } else {
-                window_sent_time[ack_seq_num - (lar + 1)] = TMIN;
+                send_time[ack_seqnum - (lar + 1)] = TMIN;
             }
         }
 
-        window_info_mutex.unlock();
+        window_mutex.unlock();
     }
 }
 
@@ -58,61 +63,56 @@ int main(int argc, char *argv[]) {
     char *dest_ip;
     int dest_port;
     int max_buffer_size;
-    struct hostent *dest_hnet;
+    struct hostent *dest_hostname;
     char *fname;
 
     if (argc == 6) {
         fname = argv[1];
-        window_len = atoi(argv[2]);
+        window_size = atoi(argv[2]);
         max_buffer_size = MAX_DATA_SIZE * (int) atoi(argv[3]);
         dest_ip = argv[4];
         dest_port = atoi(argv[5]);
     } else {
-        cerr << "usage: ./sendfile <filename> <window_len> <buffer_size> <destination_ip> <destination_port>" << endl;
-        return 1; 
+        cerr << "usage: ./sendfile <filename> <window_size> <buffer_size> <destination_ip> <destination_port>" << endl;
+        exit(EXIT_FAILURE);
     }
 
     /* Get hostnet from server hostname or IP address */ 
-    dest_hnet = gethostbyname(dest_ip); 
-    if (!dest_hnet) {
-        cerr << "unknown host: " << dest_ip << endl;
-        return 1;
+    dest_hostname = gethostbyname(dest_ip); 
+    if (!dest_hostname) {
+		error("Could not resolve host name");
     }
 
-    memset(&server_addr, 0, sizeof(server_addr)); 
-    memset(&client_addr, 0, sizeof(client_addr)); 
+    memset(&serverAddr, 0, sizeof(serverAddr)); 
+    memset(&clientAddr, 0, sizeof(clientAddr)); 
 
     /* Fill server address data structure */
-    server_addr.sin_family = AF_INET;
-    bcopy(dest_hnet->h_addr, (char *)&server_addr.sin_addr, 
-            dest_hnet->h_length); 
-    server_addr.sin_port = htons(dest_port);
+    serverAddr.sin_family = AF_INET;
+    bcopy(dest_hostname->h_addr, (char *)&serverAddr.sin_addr, 
+            dest_hostname->h_length); 
+    serverAddr.sin_port = htons(dest_port);
 
-    /* Fill client address data structure */
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = INADDR_ANY; 
-    client_addr.sin_port = htons(0);
+    // Fill client address data structure 
+    clientAddr.sin_family = AF_INET;
+    clientAddr.sin_addr.s_addr = INADDR_ANY; 
+    clientAddr.sin_port = htons(0);
 
-    /* Create socket file descriptor */ 
-    if ((socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        cerr << "socket creation failed" << endl;
-        return 1;
+    // Create socket file descriptor 
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        error("Create Socket failed");
     }
 
-    /* Bind socket to client address */
-    if (::bind(socket_fd, (const struct sockaddr *)&client_addr, 
-            sizeof(client_addr)) < 0) { 
-        cerr << "socket binding failed" << endl;
-        return 1;
+    // Bind socket to client address
+    if (::bind(sock, (const struct sockaddr *)&clientAddr, sizeof(clientAddr)) < 0) { 
+        error("Binding Socket failed");
     }
-
+    
     if (access(fname, F_OK) == -1) {
-        cerr << "file doesn't exist: " << fname << endl;
-        return 1;
+        error("File not found");
     }
 
     /* Open file to send */
-    FILE *file = fopen(fname, "rb");
+    FILE *fp = fopen(fname, "rb");
     char buffer[max_buffer_size];
     int buffer_size;
 
@@ -131,71 +131,71 @@ int main(int argc, char *argv[]) {
 
         /* Read part of file to buffer */
         cout << endl << "[!] Read file and put to buffer";
-        buffer_size = fread(buffer, 1, max_buffer_size, file);
+        buffer_size = fread(buffer, 1, max_buffer_size, fp);
         if (buffer_size == max_buffer_size) {
             char temp[1];
-            int next_buffer_size = fread(temp, 1, 1, file);
+            int next_buffer_size = fread(temp, 1, 1, fp);
             if (next_buffer_size == 0) read_done = true;
-            int error = fseek(file, -1, SEEK_CUR);
+            int error = fseek(fp, -1, SEEK_CUR);
         } else if (buffer_size < max_buffer_size) {
             read_done = true;
         }
         
-        window_info_mutex.lock();
+        window_mutex.lock();
 
         /* Initialize sliding window variables */
         int seq_count = buffer_size / MAX_DATA_SIZE + ((buffer_size % MAX_DATA_SIZE == 0) ? 0 : 1);
         int seq_num;
-        window_sent_time = new time_stamp[window_len];
-        window_ack_mask = new bool[window_len];
-        bool window_sent_mask[window_len];
-        for (int i = 0; i < window_len; i++) {
-            window_ack_mask[i] = false;
+        send_time = new time_stamp[window_size];
+        get_ack = new bool[window_size];
+        bool window_sent_mask[window_size];
+        for (int i = 0; i < window_size; i++) {
+            get_ack[i] = false;
             window_sent_mask[i] = false;
         }
         lar = -1;
-        lfs = lar + window_len;
+        lfs = lar + window_size;
 
-        window_info_mutex.unlock();
+        window_mutex.unlock();
         
         /* Send current buffer with sliding window */
         bool send_done = false;
         while (!send_done) {
 
-            window_info_mutex.lock();
+            window_mutex.lock();
 
             /* Check window ack mask, shift window if possible */
-            if (window_ack_mask[0]) {
+            if (get_ack[0]) {
                 int shift = 1;
-                for (int i = 1; i < window_len; i++) {
-                    if (!window_ack_mask[i]) break;
+                for (int i = 1; i < window_size; i++) {
+                    if (!get_ack[i]) break;
                     shift += 1;
                 }
-                for (int i = 0; i < window_len - shift; i++) {
+                for (int i = 0; i < window_size - shift; i++) {
                     window_sent_mask[i] = window_sent_mask[i + shift];
-                    window_ack_mask[i] = window_ack_mask[i + shift];
-                    window_sent_time[i] = window_sent_time[i + shift];
+                    get_ack[i] = get_ack[i + shift];
+                    send_time[i] = send_time[i + shift];
                 }
-                for (int i = window_len - shift; i < window_len; i++) {
+                for (int i = window_size - shift; i < window_size; i++) {
                     window_sent_mask[i] = false;
-                    window_ack_mask[i] = false;
+                    get_ack[i] = false;
                 }
                 lar += shift;
-                lfs = lar + window_len;
+                lfs = lar + window_size;
             }
 
-            window_info_mutex.unlock();
+            window_mutex.unlock();
 
             /* Send frames that has not been sent or has timed out */
-            for (int i = 0; i < window_len; i ++) {
+            for (int i = 0; i < window_size; i ++) {
                 seq_num = lar + i + 1;
 
                 if (seq_num < seq_count) {
-                    window_info_mutex.lock();
+                    window_mutex.lock();
 
-                    if (!window_sent_mask[i] || (!window_ack_mask[i] && (elapsed_time(current_time(), window_sent_time[i]) > TIMEOUT))) {
-                        if (window_sent_mask[i] && !window_ack_mask[i] && (elapsed_time(current_time(), window_sent_time[i]) > TIMEOUT)) {
-                            cout << endl << "[x] ACK for frame " << seq_num << " has timed out";
+                    if (!window_sent_mask[i] || (!get_ack[i] && (elapsed_time(current_time(), send_time[i]) > TIMEOUT))) {
+                        if (window_sent_mask[i] && !get_ack[i] && (elapsed_time(current_time(), send_time[i]) > TIMEOUT)) {
+                            cout << endl << "[x] Frame ACK " << seq_num << " has timed out";
                         }
                         int buffer_shift = seq_num * MAX_DATA_SIZE;
                         data_size = (buffer_size - buffer_shift < MAX_DATA_SIZE) ? (buffer_size - buffer_shift) : MAX_DATA_SIZE;
@@ -204,14 +204,14 @@ int main(int argc, char *argv[]) {
                         bool eot = (seq_num == seq_count - 1) && (read_done);
                         frame_size = createFrame(seq_num, frame, data, data_size, eot);
 
-                        sendto(socket_fd, frame, frame_size, 0, 
-                                (const struct sockaddr *) &server_addr, sizeof(server_addr));
+                        sendto(sock, frame, frame_size, 0, 
+                                (const struct sockaddr *) &serverAddr, sizeof(serverAddr));
                         window_sent_mask[i] = true;
-                        window_sent_time[i] = current_time();
+                        send_time[i] = current_time();
                         cout << endl << "<- Sending Frame " << seq_num;
                     }
 
-                    window_info_mutex.unlock();
+                    window_mutex.unlock();
                 }
             }
 
@@ -225,9 +225,9 @@ int main(int argc, char *argv[]) {
         if (read_done) break;
     }
     
-    fclose(file);
-    delete [] window_ack_mask;
-    delete [] window_sent_time;
+    fclose(fp);
+    delete [] get_ack;
+    delete [] send_time;
     recv_thread.detach();
 
     cout << "\nData Sent" << endl;
