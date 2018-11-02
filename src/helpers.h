@@ -18,7 +18,6 @@
 
 typedef unsigned char byte;
 
-void error(std::string msg);
 char checksum(char *frame, int count);
 int createFrame(int seq_num, char *frame, char *data, int data_size, bool eot);
 void createACK(int seq_num, char *ack, bool error);
